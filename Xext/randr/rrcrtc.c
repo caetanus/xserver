@@ -238,6 +238,8 @@ RRCrtcNotify(RRCrtcPtr crtc,
                            &crtc->transform, &crtc->f_transform,
                            &crtc->f_inverse);
     }
+    for (i = 0; i < crtc->numOutputs; i++)
+        RROutputUpdateAutoDPI(crtc->outputs[i]);
     return TRUE;
 }
 

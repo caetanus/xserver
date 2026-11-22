@@ -460,4 +460,12 @@ Bool RRTransformEqual(RRTransformPtr a, RRTransformPtr b);
  */
 Bool RRTransformCopy(RRTransformPtr dst, RRTransformPtr src);
 
+/*
+ * @brief (re)compute the output's "DPI" property according to -outputdpi
+ *
+ * Called whenever something the value depends on changes (physical size,
+ * mode list, CRTC mode). A value a client set explicitly is never clobbered.
+ */
+void RROutputUpdateAutoDPI(RROutputPtr output);
+
 #endif /* _XSERVER_RANDRSTR_PRIV_H_ */

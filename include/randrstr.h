@@ -151,6 +151,7 @@ struct _rrOutput {
     RRPropertyPtr properties;
     Bool pendingProperties;
     void *devPrivate;
+    int autoDPI;                /* last DPI value set by -outputdpi, 0 = none */
 };
 
 struct _rrProvider {

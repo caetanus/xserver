@@ -282,6 +282,8 @@ UseMsg(void)
     ErrorF("-core                  generate core dump on fatal error\n");
     ErrorF("-displayfd fd          file descriptor to write display number to when ready to connect\n");
     ErrorF("-dpi int               screen resolution in dots per inch\n");
+    ErrorF("-outputdpi spec        per-monitor DPI property: \"auto\" (from EDID size\n"
+           "                       and current mode) and/or OUTPUT=DPI,... overrides\n");
     ErrorF("-grabtimeout int       release device grabs of clients not reading\n"
            "                       their events for int seconds (0 = off)\n");
 #ifdef DPMSExtension
@@ -512,6 +514,12 @@ ProcessCommandLine(int argc, char *argv[])
                     autosetDPI = true;
                 else
                     monitorResolution = atoi(argv[i]);
+            else
+                UseMsg();
+        }
+        else if (strcmp(argv[i], "-outputdpi") == 0) {
+            if (++i < argc)
+                outputDPISpec = argv[i];
             else
                 UseMsg();
         }

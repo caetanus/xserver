@@ -664,6 +664,8 @@ typedef enum {
     FLAG_ALLOW_BYTE_SWAPPED_CLIENTS,
     FLAG_SINGLE_DRIVER,
     FLAG_FONTSERVER,
+    FLAG_GRAB_TIMEOUT,
+    FLAG_OUTPUT_DPI,
 } FlagValues;
 
 /**
@@ -730,6 +732,10 @@ static OptionInfoRec FlagOptions[] = {
     {FLAG_SINGLE_DRIVER, "SingleDriver", OPTV_BOOLEAN,
      {0}, FALSE},
     {FLAG_FONTSERVER, "FontServerConnections", OPTV_BOOLEAN,
+     {0}, FALSE},
+    {FLAG_GRAB_TIMEOUT, "GrabTimeout", OPTV_INTEGER,
+     {0}, FALSE},
+    {FLAG_OUTPUT_DPI, "OutputDPI", OPTV_STRING,
      {0}, FALSE},
     {-1, NULL, OPTV_NONE,
      {0}, FALSE},
@@ -1002,6 +1008,21 @@ configServerFlags(XF86ConfFlagsPtr flagsconf, XF86OptionPtr layoutopts)
         xf86Info.dri2From = X_CONFIG;
     }
 #endif
+
+    /* command line (-grabtimeout / -outputdpi) wins over the config file */
+    if (grabTimeout == 0 &&
+        xf86GetOptValInteger(FlagOptions, FLAG_GRAB_TIMEOUT, &i) && i > 0)
+        grabTimeout = i;
+    if (grabTimeout > 0)
+        LogMessageVerb(X_INFO, 1, "Grab timeout: %d s\n", grabTimeout);
+
+    if (!outputDPISpec) {
+        const char *spec = xf86GetOptValString(FlagOptions, FLAG_OUTPUT_DPI);
+        if (spec && *spec)
+            outputDPISpec = strdup(spec);
+    }
+    if (outputDPISpec)
+        LogMessageVerb(X_INFO, 1, "Per-output DPI: \"%s\"\n", outputDPISpec);
 
     from = X_DEFAULT;
     if (LimitClients != DIX_LIMITCLIENTS)

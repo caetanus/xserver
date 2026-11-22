@@ -79,6 +79,10 @@ extern _X_EXPORT bool autosetDPI;
  * server forcibly releases its device grabs. 0 disables. */
 extern int grabTimeout;
 
+/* -outputdpi: per-output policy for the RandR "DPI" output property.
+ * Comma separated list of "auto" and/or "OUTPUT=DPI" entries; NULL = off. */
+extern const char *outputDPISpec;
+
 /*
  * @brief callback right after one screen's root window has been initialized
  *

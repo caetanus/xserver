@@ -164,6 +164,18 @@ sets the resolution for all screens, in dots per inch.
 To be used when the server cannot determine the screen size(s) from the
 hardware.
 .TP 8
+.B \-outputdpi \fIspec\fP
+controls the per-output RandR \fBDPI\fP property (96 = 1x scale), which
+toolkits can use for per-monitor (fractional) scaling.  \fIspec\fP is a
+comma separated list of \fBauto\fP and/or \fIOUTPUT\fP\fB=\fP\fIDPI\fP
+entries.  With \fBauto\fP the value is derived from the output's current mode
+width and the physical width reported by the monitor, rounded to 0.25x steps
+and clamped to 1x..4x (e.g. a 32" 4K panel at 3840x2160 gets 144, the same
+panel at 2560x1440 gets 96), and it is recomputed when the mode or monitor
+changes.  \fIOUTPUT\fP\fB=\fP\fIDPI\fP forces a value for that output.  A value
+set by a client (e.g. \fIxrandr \-\-output X \-\-set DPI N\fP) is not
+overridden.  Also available as the \fBOutputDPI\fP ServerFlags option.
+.TP 8
 .B \-grabtimeout \fIseconds\fP
 releases the keyboard and pointer grabs of a client that keeps its input
 events unread for the given number of seconds, i.e. whose event loop is stuck
@@ -171,7 +183,8 @@ while it holds a grab (typically a hung application with an open popup menu).
 Without this, such a client freezes input for the whole session.  The client
 is not killed; only its device grabs are released and logged.  Clients that
 are idle, or that keep reading their events, are never affected.  The default
-is 0, which disables this check.
+is 0, which disables this check.  Also available as the \fBGrabTimeout\fP
+ServerFlags option.
 .TP 8
 .B dpms
 enables DPMS (display power management services), where supported.  The

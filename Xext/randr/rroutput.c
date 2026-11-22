@@ -22,7 +22,10 @@
  */
 #include <dix-config.h>
 
+#include <math.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 #include <X11/Xatom.h>
 
 #include "dix/dix_priv.h"
@@ -59,6 +62,109 @@ RROutputChanged(RROutputPtr output, Bool configChanged)
     RRSetChanged(pScreen);
     if (configChanged)
         primarysp->configChanged = TRUE;
+}
+
+/*
+ * -outputdpi policy for the "DPI" output property (96 = 1x).
+ *
+ * "auto": derive the density from the current mode width and the physical
+ * width reported by the monitor (EDID), then round the resulting scale to
+ * 0.25 steps, clamped to [1x, 4x]. E.g. a 32" 4K panel at 3840x2160 gives
+ * ~140 dpi -> 1.5x -> 144; the same panel running 2560x1440 gives 1x.
+ * "NAME=VALUE" entries force a value for that output.
+ */
+#define OUTPUT_DPI_BASE 96
+#define OUTPUT_DPI_MIN_MM 100   /* smaller widths are bogus / aspect-only EDIDs */
+
+static bool
+OutputDPISpecLookup(const char *name, int *forced, bool *autodpi)
+{
+    *forced = 0;
+    *autodpi = false;
+    if (!outputDPISpec || !*outputDPISpec)
+        return false;
+
+    const char *p = outputDPISpec;
+    size_t namelen = strlen(name);
+    while (*p) {
+        const char *end = strchr(p, ',');
+        size_t len = end ? (size_t) (end - p) : strlen(p);
+        const char *eq = memchr(p, '=', len);
+
+        if (!eq) {
+            if (len == 4 && strncmp(p, "auto", 4) == 0)
+                *autodpi = true;
+        }
+        else if ((size_t) (eq - p) == namelen && strncmp(p, name, namelen) == 0) {
+            int v = atoi(eq + 1);
+            if (v > 0 && v <= 960)
+                *forced = v;
+        }
+        p += len;
+        if (*p == ',')
+            p++;
+    }
+    return true;
+}
+
+static int
+RROutputComputeDPI(RROutputPtr output)
+{
+    int forced;
+    bool autodpi;
+
+    if (!OutputDPISpecLookup(output->name, &forced, &autodpi))
+        return 0;
+    if (forced)
+        return forced;
+    if (!autodpi || output->mmWidth < OUTPUT_DPI_MIN_MM)
+        return 0;
+
+    int px = 0;
+    if (output->crtc && output->crtc->mode)
+        px = output->crtc->mode->mode.width;
+    else if (output->numModes > 0 && output->numPreferred > 0)
+        px = output->modes[0]->mode.width;
+    if (px <= 0)
+        return 0;
+
+    double dpi = (double) px * 25.4 / output->mmWidth;
+    double scale = round(dpi / OUTPUT_DPI_BASE * 4.0) / 4.0;
+    if (scale < 1.0)
+        scale = 1.0;
+    if (scale > 4.0)
+        scale = 4.0;
+    return (int) lround(scale * OUTPUT_DPI_BASE);
+}
+
+void
+RROutputUpdateAutoDPI(RROutputPtr output)
+{
+    int value = RROutputComputeDPI(output);
+    if (value <= 0)
+        return;
+
+    Atom dpiAtom = MakeAtom("DPI", 3, FALSE);
+    if (dpiAtom == None)
+        return;
+
+    RRPropertyValuePtr cur = RRGetOutputProperty(output, dpiAtom, FALSE);
+    if (cur && cur->type == XA_INTEGER && cur->format == 32 && cur->size == 1) {
+        INT32 now = *(INT32 *) cur->data;
+        /* someone (xrandr --set DPI) changed it after us: respect that */
+        if (output->autoDPI && now != output->autoDPI)
+            return;
+        if (now == value) {
+            output->autoDPI = value;
+            return;
+        }
+    }
+
+    output->autoDPI = value;
+    INT32 v = value;
+    /* pending=FALSE: server-side update, doesn't need the driver's approval */
+    (void) RRChangeOutputProperty(output, dpiAtom, XA_INTEGER, 32,
+                                  PropModeReplace, 1, &v, TRUE, FALSE);
 }
 
 /*
@@ -128,6 +234,7 @@ RROutputCreate(ScreenPtr pScreen,
         (void) RRChangeOutputProperty(output, DPIAtom, XA_INTEGER, 32,
                                       PropModeReplace, 1, &value, FALSE, FALSE);
     }
+    RROutputUpdateAutoDPI(output);
 
     RRResourcesChanged(pScreen);
 
@@ -199,6 +306,7 @@ RROutputSetModes(RROutputPtr output,
     output->numModes = numModes;
     output->numPreferred = numPreferred;
     RROutputChanged(output, TRUE);
+    RROutputUpdateAutoDPI(output);
     return TRUE;
 }
 
@@ -323,6 +431,7 @@ RROutputSetPhysicalSize(RROutputPtr output, int mmWidth, int mmHeight)
     output->mmWidth = mmWidth;
     output->mmHeight = mmHeight;
     RROutputChanged(output, FALSE);
+    RROutputUpdateAutoDPI(output);
     return TRUE;
 }
 
