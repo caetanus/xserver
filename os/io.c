@@ -80,6 +80,7 @@ SOFTWARE.
 #include <errno.h>
 #if !defined(WIN32)
 #include <sys/uio.h>
+#include <sys/ioctl.h>
 #endif
 #include <X11/X.h>
 #include <X11/Xproto.h>
@@ -926,7 +927,31 @@ WriteToClient(ClientPtr who, int count, const void *buf)
     return dixWriteToClient(who, count, buf);
 }
 
- /********************
+ int
+ClientUnreadOutput(ClientPtr client)
+{
+    if (!client || client->clientGone || !client->osPrivate)
+        return -1;
+
+    OsCommPtr oc = (OsCommPtr) client->osPrivate;
+    if (oc->fd < 0)
+        return -1;
+
+    int queued = 0;
+#if defined(TIOCOUTQ)
+    if (ioctl(oc->fd, TIOCOUTQ, &queued) != 0)
+        return -1;
+#elif defined(FIONWRITE)
+    if (ioctl(oc->fd, FIONWRITE, &queued) != 0)
+        return -1;
+#else
+    return -1;
+#endif
+
+    return queued + (oc->output ? oc->output->count : 0);
+}
+
+/********************
  * FlushClient()
  *    If the client isn't keeping up with us, then we try to continue
  *    buffering the data and set the appropriate bit in ClientsWritable

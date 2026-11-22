@@ -282,6 +282,8 @@ UseMsg(void)
     ErrorF("-core                  generate core dump on fatal error\n");
     ErrorF("-displayfd fd          file descriptor to write display number to when ready to connect\n");
     ErrorF("-dpi int               screen resolution in dots per inch\n");
+    ErrorF("-grabtimeout int       release device grabs of clients not reading\n"
+           "                       their events for int seconds (0 = off)\n");
 #ifdef DPMSExtension
     ErrorF("-dpms                  disables VESA DPMS monitor control\n");
 #endif
@@ -510,6 +512,12 @@ ProcessCommandLine(int argc, char *argv[])
                     autosetDPI = true;
                 else
                     monitorResolution = atoi(argv[i]);
+            else
+                UseMsg();
+        }
+        else if (strcmp(argv[i], "-grabtimeout") == 0) {
+            if (++i < argc)
+                grabTimeout = max(0, atoi(argv[i]));
             else
                 UseMsg();
         }

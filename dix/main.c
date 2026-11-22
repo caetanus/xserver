@@ -90,6 +90,7 @@ Equipment Corporation.
 #include "dix/callback_priv.h"
 #include "dix/cursor_priv.h"
 #include "dix/dix_priv.h"
+#include "dix/dixgrabs_priv.h"
 #include "dix/input_priv.h"
 #include "dix/gc_priv.h"
 #include "dix/registry_priv.h"
@@ -254,6 +255,7 @@ dix_main(int argc, char *argv[], char *envp[])
     InitCoreDevices();
     InitInput(argc, argv);
     InitAndStartDevices();
+    GrabTimeoutInit();
     LogMessageVerb(X_INFO, 1, "Input(s) initialized\n");
 
     ReserveClientIds(serverClient);
@@ -277,6 +279,7 @@ dix_main(int argc, char *argv[], char *envp[])
     if (screenIsSaved == SCREEN_SAVER_ON)
         dixSaveScreens(serverClient, SCREEN_SAVER_OFF, ScreenSaverReset);
     FreeScreenSaverTimer();
+    GrabTimeoutFini();
     CloseDownExtensions();
 
 #ifdef XINERAMA

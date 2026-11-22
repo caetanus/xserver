@@ -37,6 +37,17 @@ void PrintDeviceGrabInfo(DeviceIntPtr dev);
 void UngrabAllDevices(Bool kill_client);
 
 /**
+ * @brief start / stop the stuck-grab watchdog (see -grabtimeout)
+ *
+ * When enabled, periodically checks every client owning a device grab. If
+ * such a client keeps events queued that it never reads (its event loop is
+ * stuck) for grabTimeout seconds, its device grabs are released so the rest
+ * of the desktop gets input back. The client itself is left alone.
+ */
+void GrabTimeoutInit(void);
+void GrabTimeoutFini(void);
+
+/**
  * @brief Allocate new grab, optionally copy from existing
  *
  * Allocate a new grab structure. If src is non-null, copy parameters from

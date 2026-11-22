@@ -75,6 +75,10 @@ extern size_t dixConnBlockScreenStart(const char *connInfo);
 /* only exported for in-tree drivers, not part of public SDK */
 extern _X_EXPORT bool autosetDPI;
 
+/* -grabtimeout: seconds a grab owner may leave its events unread before the
+ * server forcibly releases its device grabs. 0 disables. */
+extern int grabTimeout;
+
 /*
  * @brief callback right after one screen's root window has been initialized
  *

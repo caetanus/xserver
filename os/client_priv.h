@@ -49,6 +49,17 @@ int ReadRequestFromClient(struct _Client *client);
 int WriteFdToClient(struct _Client *client, int fd, Bool do_close);
 Bool InsertFakeRequest(struct _Client *client, char *data, int count);
 void FlushAllOutput(void);
+
+/*
+ * @brief amount of output the client has not consumed yet
+ *
+ * Sum of what is still buffered inside the server and what the kernel holds
+ * in the socket's send queue (on Linux the latter is accounted in kernel
+ * memory units, so only use it for comparisons, not as an exact byte count).
+ *
+ * @return >= 0 on success, -1 if this can't be determined for the client
+ */
+int ClientUnreadOutput(struct _Client *client);
 void FlushIfCriticalOutputPending(void);
 void ResetOsBuffers(void);
 void NotifyParentProcess(void);

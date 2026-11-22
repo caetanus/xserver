@@ -48,6 +48,7 @@ SOFTWARE.
 #include <dix-config.h>
 
 #include <stdbool.h>
+#include <string.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2.h>
@@ -63,6 +64,7 @@ SOFTWARE.
 #include "include/misc.h"
 #include "os/auth.h"
 #include "os/client_priv.h"
+#include "os/log_priv.h"
 #include "Xext/xinput/exglobals.h"
 
 #include "windowstr.h"
@@ -191,6 +193,104 @@ UngrabAllDevices(Bool kill_client)
     }
 
     ErrorF("End list of ungrabbed devices\n");
+}
+
+#define GRAB_WATCHDOG_INTERVAL 500 /* ms */
+
+static OsTimerPtr grabWatchdogTimer;
+
+/* Per client-slot state. A client counts as stuck while its unread output
+ * stays non-zero and never shrinks between samples: a live client drains its
+ * socket within milliseconds, a stuck one only accumulates. */
+static struct GrabWatch {
+    ClientPtr client;
+    int last_unread;
+    CARD32 stuck_since;
+} grabWatch[MAXCLIENTS];
+
+static void
+ReleaseGrabsOfClient(ClientPtr client, CARD32 stuck_ms)
+{
+    LogMessageVerb(X_WARNING, 0,
+                   "Grab timeout: client %d (pid %d, %s) has not read its "
+                   "events for %u ms, releasing its device grabs\n",
+                   client->index, GetClientPid(client),
+                   GetClientCmdName(client) ? GetClientCmdName(client) : "?",
+                   (unsigned) stuck_ms);
+
+    for (DeviceIntPtr dev = inputInfo.devices; dev; dev = dev->next) {
+        GrabPtr grab = dev->deviceGrab.grab;
+        if (grab && dixClientForXID(grab->resource) == client) {
+            PrintDeviceGrabInfo(dev);
+            dev->deviceGrab.DeactivateGrab(dev);
+        }
+    }
+}
+
+static CARD32
+GrabWatchdog(OsTimerPtr timer, CARD32 now, void *arg)
+{
+    bool seen[MAXCLIENTS] = { false };
+    const CARD32 limit = (CARD32) grabTimeout * 1000;
+
+    for (DeviceIntPtr dev = inputInfo.devices; dev; dev = dev->next) {
+        GrabPtr grab = dev->deviceGrab.grab;
+        if (!grab)
+            continue;
+
+        ClientPtr client = dixClientForXID(grab->resource);
+        if (!client || client == serverClient || client->clientGone)
+            continue;
+        if (client->index < 0 || client->index >= MAXCLIENTS ||
+            seen[client->index])
+            continue;
+        seen[client->index] = true;
+
+        int unread = ClientUnreadOutput(client);
+        struct GrabWatch *w = &grabWatch[client->index];
+
+        if (w->client != client || unread <= 0 || unread < w->last_unread) {
+            /* new owner, nothing pending, or it consumed something */
+            w->client = client;
+            w->last_unread = unread;
+            w->stuck_since = (unread > 0) ? (now ? now : 1) : 0;
+            continue;
+        }
+
+        w->last_unread = unread;
+        if (!w->stuck_since) {
+            /* output just started piling up: start the clock */
+            w->stuck_since = now ? now : 1;
+            continue;
+        }
+        if ((CARD32) (now - w->stuck_since) >= limit) {
+            ReleaseGrabsOfClient(client, now - w->stuck_since);
+            w->client = NULL;
+        }
+    }
+
+    for (int i = 0; i < MAXCLIENTS; i++)
+        if (!seen[i])
+            grabWatch[i].client = NULL;
+
+    return GRAB_WATCHDOG_INTERVAL;
+}
+
+void
+GrabTimeoutInit(void)
+{
+    memset(grabWatch, 0, sizeof(grabWatch));
+    if (grabTimeout <= 0)
+        return;
+    grabWatchdogTimer = TimerSet(grabWatchdogTimer, 0, GRAB_WATCHDOG_INTERVAL,
+                                 GrabWatchdog, NULL);
+}
+
+void
+GrabTimeoutFini(void)
+{
+    TimerFree(grabWatchdogTimer);
+    grabWatchdogTimer = NULL;
 }
 
 static Bool CopyGrab(GrabPtr dst, const GrabPtr src);

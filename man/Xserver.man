@@ -164,6 +164,15 @@ sets the resolution for all screens, in dots per inch.
 To be used when the server cannot determine the screen size(s) from the
 hardware.
 .TP 8
+.B \-grabtimeout \fIseconds\fP
+releases the keyboard and pointer grabs of a client that keeps its input
+events unread for the given number of seconds, i.e. whose event loop is stuck
+while it holds a grab (typically a hung application with an open popup menu).
+Without this, such a client freezes input for the whole session.  The client
+is not killed; only its device grabs are released and logged.  Clients that
+are idle, or that keep reading their events, are never affected.  The default
+is 0, which disables this check.
+.TP 8
 .B dpms
 enables DPMS (display power management services), where supported.  The
 default state is platform and configuration specific.
